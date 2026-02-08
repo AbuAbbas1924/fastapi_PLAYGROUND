@@ -21,7 +21,7 @@ class Book(SQLModel, table=True):
     title: str
     author: str
     publisher: str
-    published_data: str
+    published_date: str
     page_count: int
     language: str
     created_at: datetime = Field(default_factory=datetime.now)
@@ -35,7 +35,7 @@ class BookCreateModel(BaseModel):
     title: str
     author: str
     publisher: str
-    published_data: str
+    published_date: str
     page_count: int
     language: str
 
@@ -72,6 +72,7 @@ class BookService:
     async def get_book(self, book_uid: str):
         result = await self.session.execute(select(Book).where(Book.uid == book_uid))
         result = result.scalar_one_or_none()
+        return result
 
     async def update_book(self, book_uid: str, book_data: BookUpdateModel):
         book_to_update = await self.get_book(book_uid)
@@ -104,18 +105,18 @@ async def get_books(session: session_dep):
     service = BookService(session=session)
     return await service.get_books()
 
-@router.get("/{book_uid}")
+@router.get("/{book_uid}", status_code=200)
 async def get_book(book_uid: str, session: session_dep):
     service = BookService(session=session)
     return await service.get_book(book_uid)
 
 
-@router.put("/{book_uid}")
+@router.put("/{book_uid}", status_code=204)
 async def update_book(book_uid: str, book_data: BookUpdateModel, session: session_dep):
     service = BookService(session=session)
     return await service.update_book(book_uid, book_data)
 
-@router.delete("/{book_uid}")
+@router.delete("/{book_uid}", status_code=202)
 async def delete_book(book_uid: str, session: session_dep):
     service = BookService(session=session)
-    return service.delete_book(book_uid)
+    return await service.delete_book(book_uid)
