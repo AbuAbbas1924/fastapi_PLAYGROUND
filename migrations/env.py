@@ -7,8 +7,9 @@ from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
 from sqlmodel import SQLModel
 
+from book_a1.auth import User
+from book_a1.book import Book
 from book_a1.postgres import postgres_settings
-from book_a1.router import Book
 
 database_url = postgres_settings.DATABASE_URL
 # this is the Alembic Config object, which provides
@@ -25,7 +26,6 @@ target_metadata = SQLModel.metadata
 # for 'autogenerate' support
 # from myapp import mymodel
 # target_metadata = mymodel.Base.metadata
-target_metadata = None
 
 # other values from the config, defined by the needs of env.py,
 # can be acquired:
