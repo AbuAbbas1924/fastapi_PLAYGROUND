@@ -8,7 +8,7 @@ from pydantic import BaseModel
 from sqlmodel import Column, Field, SQLModel, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from book_a1.postgres import db
+from book_a1.db import db
 
 
 class Book(SQLModel, table=True):
@@ -92,7 +92,7 @@ class BookService:
         await self.session.commit()
         return book_to_delete
 
-router = APIRouter(prefix="/book_a1", tags=["book_a1"])
+router = APIRouter()
 session_dep = Annotated[AsyncSession, Depends(db)]
 
 @router.post("/", status_code=201)
