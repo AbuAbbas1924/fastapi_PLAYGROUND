@@ -1,6 +1,7 @@
 import logging
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from sqlalchemy import MetaData
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlmodel import SQLModel
@@ -21,6 +22,7 @@ class PostgresSettings(BaseSettings):
 
 settings = PostgresSettings()
 
+book_a1_meta = MetaData()
 
 class Database:
     def __init__(self, url: str):
@@ -36,7 +38,7 @@ class Database:
     async def init(self):
         try:
             async with self.async_engine.begin() as conn:
-                await conn.run_sync(SQLModel.metadata.create_all, checkfirst=True)
+                await conn.run_sync(book_a1_meta.create_all, checkfirst=True)
             logger.info("✓ Database connected successfully")
         except (OperationalError, OSError, ConnectionRefusedError) as e:
             logger.error("✗ Failed to connect to PostgreSQL database")

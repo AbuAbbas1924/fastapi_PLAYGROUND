@@ -20,7 +20,7 @@ async def async_lifespan(app: FastAPI):
         print(f"\nReason: {str(e)}")
         print("\nTo fix this:")
         print("  1. Start PostgreSQL server")
-        print("  2. Verify connection settings in book_a1/.env")
+        print("  2. Verify connection settings in every .env files")
         print("  3. Restart the application\n")
         print("=" * 50)
         raise

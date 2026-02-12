@@ -5,13 +5,16 @@ from typing import Annotated
 # import bcrypt
 import jwt
 import sqlalchemy.dialects.postgresql as pg
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.security import HTTPBearer
 from passlib.context import CryptContext
+from pydantic import BaseModel
 from sqlmodel import Column, Field, SQLModel, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from book_a1.db import db, settings
 
+# test refresh => curl -X POST http://127.0.0.1:8000/book_a1/refresh -H "Authorization: Bearer <REFRESH TOKEN>"
 session_dep = Annotated[AsyncSession, Depends(db)]
 pwd_context = CryptContext(schemes=["argon2"], deprecated="auto")
 
@@ -32,6 +35,7 @@ def verify_password(plain_pwd: str, hashed_pwd: str) -> bool:
 
 
 ACCESS_TOKEN_EXPIRE = 5
+REFRESH_TOKEN_EXPIRE = 7
 
 
 def create_access_token(
@@ -45,20 +49,21 @@ def create_access_token(
     # to_encode.update({"exp": expire})
     # encoded_jwt = jwt.encode(to_encode, secret_key, algorithm=algorithm)
     # return encoded_jwt
-    payload = {}
-    payload["user"] = data
+    payload = data.copy()  # Flatten the structure
     payload["exp"] = datetime.now(timezone.utc) + (
         expiry if expiry else timedelta(minutes=ACCESS_TOKEN_EXPIRE)
     )
     payload["jti"] = str(uuid.uuid4())
     payload["refresh"] = refresh
-    return jwt.encode(payload, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
+    return jwt.encode(
+        payload, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM
+    )
 
 
 def decode_access_token(token: str) -> dict:
     try:
         payload = jwt.decode(
-            token, key=settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM
+            token, key=settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM]
         )
         return payload
     except jwt.ExpiredSignatureError:
@@ -66,7 +71,53 @@ def decode_access_token(token: str) -> dict:
     except jwt.DecodeError:
         raise HTTPException(status_code=401, detail="Token invalid")
 
+class TokenBearer(HTTPBearer):
+    def __init__(self, auto_error: bool = True):
+        super().__init__(auto_error=auto_error)
 
+    def verify_token(self, token: str) -> dict | None:
+        try:
+            token_data = decode_access_token(token)
+            return token_data
+        except Exception:
+            return None
+
+    async def __call__(self, request: Request) -> dict:
+        credentials = await super().__call__(request)
+        print(f"scheme: {credentials.scheme}")
+        print(f"credentials: {credentials.credentials}")
+        token_data = self.verify_token(credentials.credentials)
+        if not token_data:
+            raise HTTPException(status_code=403, detail="Invalid or expired token")
+        print(f"DEBUG - Decoded token data: {token_data}")
+        return token_data
+
+
+token_bearer = TokenBearer()
+
+
+class AccessTokenBearer(TokenBearer):
+    # def verify_token_data(self, token_data: dict) -> bool:
+    #     return True if token_data.get("refresh") else False
+    def verify_token(self, token: str) -> dict | None:
+        token_data = super().verify_token(token)
+        if token_data and not token_data.get("refresh"):
+            return token_data
+        return None
+
+
+access_token_bearer = AccessTokenBearer()
+
+
+class RefreshTokenBearer(TokenBearer):
+    def verify_token(self, token: str) -> dict | None:
+        token_data = super().verify_token(token)
+        if token_data and token_data.get("refresh"):
+            return token_data
+        return None
+
+
+refresh_token_bearer = RefreshTokenBearer()
 class User(SQLModel, table=True):
     __tablename__ = "users"
     __table_args__ = {"extend_existing": True}
@@ -169,7 +220,7 @@ async def login(user_login: UserLoginModel, session: session_dep):
     )
     refresh_token = create_access_token(
         data={"email": user.email, "username": user.username, "uid": str(user.uuid)},
-        expiry=timedelta(minutes=ACCESS_TOKEN_EXPIRE),
+        expiry=timedelta(minutes=REFRESH_TOKEN_EXPIRE),
         refresh=True,
     )
     return {
@@ -198,7 +249,57 @@ async def login2(login_data: UserLoginModel, session: session_dep):
     )
     refresh_token = create_access_token(
         data={"email": user.email, "username": user.username, "uid": str(user.uuid)},
-        expiry=timedelta(minutes=ACCESS_TOKEN_EXPIRE),
+        expiry=timedelta(minutes=REFRESH_TOKEN_EXPIRE),
         refresh=True,
     )
     return {"access_token": access_token, "refresh_token": refresh_token, "user": user}
+
+class RefreshTokenRequest(BaseModel):
+    refresh_token: str
+
+
+@router.post("/refresh")
+async def refresh_token(request: RefreshTokenRequest):
+    # Decode and validate the refresh token
+    token_data = decode_access_token(request.refresh_token)
+
+    # Debug: print token data
+    print(f"DEBUG - Token data: {token_data}")
+    print(f"DEBUG - refresh field value: {token_data.get('refresh')}")
+
+    # Check if it's actually a refresh token
+    if not token_data.get("refresh"):
+        raise HTTPException(
+            status_code=401,
+            detail=f"Invalid token type. Expected refresh token, got refresh={token_data.get('refresh')}",
+        )
+
+    # Check if token is expired (already handled by decode_access_token, but double-checking)
+    expiry_timestamp = token_data.get("exp")
+    print(f"expiry_timestamp: {expiry_timestamp}")
+
+    # Create new access token
+    new_access_token = create_access_token(
+        data={
+            "email": token_data["email"],
+            "username": token_data["username"],
+            "uid": token_data["uid"],
+        },
+        expiry=timedelta(minutes=ACCESS_TOKEN_EXPIRE),
+        refresh=False,
+    )
+
+    # Calculate new expiry timestamp
+    new_expiry = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE)
+
+    return {
+        "access_token": new_access_token,
+        "token_type": "bearer",
+        "old_expiry": datetime.fromtimestamp(expiry_timestamp).isoformat(),
+        "new_expiry": new_expiry.isoformat(),
+        "user": {
+            "email": token_data["email"],
+            "username": token_data["username"],
+            "uid": token_data["uid"],
+        },
+    }

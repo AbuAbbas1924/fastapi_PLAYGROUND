@@ -9,9 +9,9 @@ from sqlmodel import SQLModel
 
 from book_a1.auth import User
 from book_a1.book import Book
-from book_a1.postgres import postgres_settings
+from book_a1.db import settings
 
-database_url = postgres_settings.DATABASE_URL
+database_url = settings.DATABASE_URL
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
 config = context.config

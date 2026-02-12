@@ -8,12 +8,16 @@ from pydantic import BaseModel
 from sqlmodel import Column, Field, SQLModel, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from book_a1.db import db
+from book_a1.auth import access_token_bearer
+from book_a1.db import book_a1_meta, db
+
+# 1. authorize JWT token => curl -X GET "http://localhost:8000/books" -H "Authorization: Bearer <JWT>" -H "accept: application/json"
 
 
 class Book(SQLModel, table=True):
     __tablename__ = "books"
     __table__args = {"extend_existing": True}
+    metadata = book_a1_meta
     uid: uuid.UUID = Field(
         sa_column=Column(pg.UUID(as_uuid=True), primary_key=True, nullable=False),
         default_factory=uuid.uuid4,
@@ -94,29 +98,32 @@ class BookService:
 
 router = APIRouter()
 session_dep = Annotated[AsyncSession, Depends(db)]
+user_dep = Annotated[dict, Depends(access_token_bearer)]
 
 @router.post("/", status_code=201)
-async def create_book(book_data: BookCreateModel, session: session_dep):
+async def create_book(book_data: BookCreateModel, session: session_dep, user: user_dep):
     service = BookService(session)
     return await service.create_book(book_data)
 
 @router.get("/", status_code=200)
-async def get_books(session: session_dep):
+async def get_books(session: session_dep, user: user_dep):
     service = BookService(session=session)
     return await service.get_books()
 
 @router.get("/{book_uid}", status_code=200)
-async def get_book(book_uid: str, session: session_dep):
+async def get_book(book_uid: str, session: session_dep, user: user_dep):
     service = BookService(session=session)
     return await service.get_book(book_uid)
 
 
 @router.put("/{book_uid}", status_code=204)
-async def update_book(book_uid: str, book_data: BookUpdateModel, session: session_dep):
+async def update_book(
+    book_uid: str, book_data: BookUpdateModel, session: session_dep, user: user_dep
+):
     service = BookService(session=session)
     return await service.update_book(book_uid, book_data)
 
 @router.delete("/{book_uid}", status_code=202)
-async def delete_book(book_uid: str, session: session_dep):
+async def delete_book(book_uid: str, session: session_dep, user: user_dep):
     service = BookService(session=session)
     return await service.delete_book(book_uid)
