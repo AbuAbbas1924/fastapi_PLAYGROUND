@@ -1,10 +1,10 @@
 import logging
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from redis import asyncio as aioredis
 from sqlalchemy import MetaData
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
-from sqlmodel import SQLModel
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 logger = logging.getLogger(__name__)
@@ -18,11 +18,31 @@ class PostgresSettings(BaseSettings):
     DATABASE_URL: str
     JWT_SECRET_KEY: str
     JWT_ALGORITHM: str
+    REDIS_HOST: str = "127.0.0.1"
+    REDIS_PORT: int = 6379
+    # REDIS_DB : int = 0
 
 
 settings = PostgresSettings()
 
 book_a1_meta = MetaData()
+
+JTI_EXPIRY = 30
+
+token_blocked_list = aioredis.Redis(
+    host=settings.REDIS_HOST, port=settings.REDIS_PORT, db=0, decode_responses=True
+)
+
+
+async def add_jti_blocklist(jti: str):
+    # await token_blocked_list.set(jti, JTI_EXPIRY, "true")
+    await token_blocked_list.set(name=jti, ex=JTI_EXPIRY, value="true")
+
+
+async def token_in_blocklist(jti: str) -> bool:
+    jti = await token_blocked_list.get(name=jti)
+    return jti is not None
+
 
 class Database:
     def __init__(self, url: str):

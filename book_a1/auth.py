@@ -12,7 +12,13 @@ from pydantic import BaseModel
 from sqlmodel import Column, Field, SQLModel, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from book_a1.db import db, settings
+from book_a1.db import (
+    add_jti_blocklist,
+    db,
+    settings,
+    token_blocked_list,
+    token_in_blocklist,
+)
 
 # test refresh => curl -X POST http://127.0.0.1:8000/book_a1/refresh -H "Authorization: Bearer <REFRESH TOKEN>"
 session_dep = Annotated[AsyncSession, Depends(db)]
@@ -89,6 +95,10 @@ class TokenBearer(HTTPBearer):
         token_data = self.verify_token(credentials.credentials)
         if not token_data:
             raise HTTPException(status_code=403, detail="Invalid or expired token")
+        if await token_in_blocklist(token_data["jti"]):
+            raise HTTPException(
+                status_code=403, detail="Token has been revoked, obtain new token"
+            )
         print(f"DEBUG - Decoded token data: {token_data}")
         return token_data
 
@@ -303,3 +313,13 @@ async def refresh_token(request: RefreshTokenRequest):
             "uid": token_data["uid"],
         },
     }
+
+@router.post("/logout")
+async def logout(token_data: dict = Depends(access_token_bearer)):
+    jti = token_data["jti"]
+    # Check if token is already revoked
+    if await token_in_blocklist(jti):
+        raise HTTPException(status_code=401, detail="Token already revoked")
+    # Add token to blocklist
+    await add_jti_blocklist(jti)
+    return {"detail": "Logout successful"}
