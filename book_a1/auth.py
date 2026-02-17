@@ -161,8 +161,19 @@ class UserCreateModel(SQLModel):
 
 
 class UserLoginModel(SQLModel):
+    email: str = "a@a.aa"
+    password: str = "a"
+
+
+class UserRead(SQLModel):
+    uuid: uuid.UUID
+    username: str
     email: str
-    password: str
+    first_name: str | None = None
+    last_name: str | None = None
+    is_verified: bool
+    created_at: datetime
+    updated_at: datetime
 
 
 class UserService:
@@ -205,11 +216,23 @@ class UserService:
             return user
         return None
 
+async def get_current_user(
+    token_details: Annotated[dict, Depends(access_token_bearer)], session: session_dep
+):
+    user_email = token_details["email"]
+    print(f"DEBUG - token_details: {token_details}")
+    user = await UserService(session).get_user_by_email(user_email)
+    if not user:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+    return user
 
 router = APIRouter()
 
+@router.get("/me", response_model=UserRead)
+async def get_me(user: Annotated[User, Depends(get_current_user)]):
+    return user
 
-@router.post("/register", response_model=User, status_code=201)
+@router.post("/register", response_model=UserRead, status_code=201)
 async def register(user_create: UserCreateModel, session: session_dep):
     user_service = UserService(session)
     user_exists = await user_service.user_exists(user_create.email)
