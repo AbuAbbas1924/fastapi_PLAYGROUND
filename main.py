@@ -3,6 +3,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
+from auth_b1.main import router as auth_b1_router
 from book_a1 import api as book_a1_api
 from htmx_todo_a1.main import router as htmx_todo_a1_router
 
@@ -38,6 +39,7 @@ app = FastAPI(
 )
 app.include_router(book_a1_api.router)
 app.include_router(htmx_todo_a1_router)
+app.include_router(auth_b1_router)
 app.mount(
     "/htmx_todo_a1/static",
     StaticFiles(directory="htmx_todo_a1/static"),
