@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime, timedelta, timezone
-from typing import Annotated
+from typing import Annotated, List
 
 # import bcrypt
 import jwt
@@ -16,7 +16,6 @@ from book_a1.db import (
     add_jti_blocklist,
     db,
     settings,
-    token_blocked_list,
     token_in_blocklist,
 )
 
@@ -140,6 +139,10 @@ class User(SQLModel, table=True):
     password: str
     first_name: str | None = None
     last_name: str | None = None
+    role: str = Field(
+        default="user",
+        sa_column=Column(pg.VARCHAR(50), nullable=False, server_default="user"),
+    )
     is_verified: bool = Field(default=False)
     created_at: datetime = Field(
         default_factory=lambda: datetime.now(timezone.utc),
@@ -153,6 +156,14 @@ class User(SQLModel, table=True):
     def __repr__(self) -> str:
         return f"User-(uuid={self.uuid}, username={self.username}, email={self.email})"
 
+class RoleChecker:
+    def __init__(self, allowed_roles: List[str]):
+        self.allowed_roles = allowed_roles
+
+    async def __call__(self, token_data: Annotated[dict, Depends(access_token_bearer)]):
+        user_role = token_data.get("role")
+        if user_role not in self.allowed_roles:
+            raise HTTPException(status_code=403, detail="Not enough permissions")
 
 class UserCreateModel(SQLModel):
     username: str
@@ -249,10 +260,10 @@ async def login(user_login: UserLoginModel, session: session_dep):
         raise HTTPException(status_code=401, detail="Invalid credentials")
     # access_token = create_access_token({"sub": user.email})
     access_token = create_access_token(
-        data={"email": user.email, "username": user.username, "uid": str(user.uuid)}
+        data={"email": user.email, "username": user.username, "uid": str(user.uuid), "role": user.role}
     )
     refresh_token = create_access_token(
-        data={"email": user.email, "username": user.username, "uid": str(user.uuid)},
+        data={"email": user.email, "username": user.username, "uid": str(user.uuid), "role": user.role},
         expiry=timedelta(minutes=REFRESH_TOKEN_EXPIRE),
         refresh=True,
     )
@@ -264,6 +275,7 @@ async def login(user_login: UserLoginModel, session: session_dep):
             "email": user.email,
             "username": user.username,
             "uid": str(user.uuid),
+            "role": user.role,
         },
     }
 

@@ -8,11 +8,12 @@ from pydantic import BaseModel
 from sqlmodel import Column, Field, SQLModel, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from book_a1.auth import access_token_bearer
+from book_a1.auth import RoleChecker, access_token_bearer
 from book_a1.db import book_a1_meta, db
 
 # 1. authorize JWT token => curl -X GET "http://localhost:8000/books" -H "Authorization: Bearer <JWT>" -H "accept: application/json"
 
+role_checker = RoleChecker(allowed_roles=["admin"])
 
 class Book(SQLModel, table=True):
     __tablename__ = "books"
@@ -100,30 +101,52 @@ router = APIRouter()
 session_dep = Annotated[AsyncSession, Depends(db)]
 user_dep = Annotated[dict, Depends(access_token_bearer)]
 
-@router.post("/", status_code=201)
+@router.post(
+    "/", status_code=201, response_model=Book, dependencies=[Depends(role_checker)]
+)
 async def create_book(book_data: BookCreateModel, session: session_dep, user: user_dep):
     service = BookService(session)
     return await service.create_book(book_data)
 
-@router.get("/", status_code=200)
+@router.get(
+    "/",
+    status_code=200,
+    response_model=list[Book],
+    dependencies=[Depends(role_checker)],
+)
 async def get_books(session: session_dep, user: user_dep):
     service = BookService(session=session)
     return await service.get_books()
 
-@router.get("/{book_uid}", status_code=200)
+@router.get(
+    "/{book_uid}",
+    status_code=200,
+    response_model=Book,
+    dependencies=[Depends(role_checker)],
+)
 async def get_book(book_uid: str, session: session_dep, user: user_dep):
     service = BookService(session=session)
     return await service.get_book(book_uid)
 
 
-@router.put("/{book_uid}", status_code=204)
+@router.put(
+    "/{book_uid}",
+    status_code=200,
+    response_model=Book,
+    dependencies=[Depends(role_checker)],
+)
 async def update_book(
     book_uid: str, book_data: BookUpdateModel, session: session_dep, user: user_dep
 ):
     service = BookService(session=session)
     return await service.update_book(book_uid, book_data)
 
-@router.delete("/{book_uid}", status_code=202)
+@router.delete(
+    "/{book_uid}",
+    status_code=202,
+    response_model=Book,
+    dependencies=[Depends(role_checker)],
+)
 async def delete_book(book_uid: str, session: session_dep, user: user_dep):
     service = BookService(session=session)
     return await service.delete_book(book_uid)

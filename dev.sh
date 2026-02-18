@@ -24,7 +24,7 @@ app_run(){
 }
 
 migrate(){
-    uv run alembic --autogenerate && uv run alembic upgrade head
+    uv run alembic revision --autogenerate && uv run alembic upgrade head
 }
 redis(){
     docker run --name redis -p 6379:6379 redis:8.6-alpine
