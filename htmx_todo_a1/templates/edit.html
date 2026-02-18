@@ -1,0 +1,18 @@
+<form hx-patch="/htmx_todo_a1/edit/{{ todo.id }}"
+      hx-target="this"
+      hx-swap="outerHTML"
+      hx-trigger="submit">
+    <input type="text"
+           name="task"
+           value="{{ todo.task }}"
+           hx-trigger="keyup changed delay:500ms"
+           placeholder="Enter a task"
+           required>
+    <input type="number"
+           name="priority"
+           value="{{ todo.priority }}"
+           hx-trigger="keyup changed delay:500ms"
+           placeholder="Priority"
+           id="">
+    <button type="submit">edit</button>
+</form>

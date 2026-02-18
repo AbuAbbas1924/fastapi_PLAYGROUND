@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1.0">
+    <script src="{{url_for('htmx_todo_a1_static', path='alp.js')}}"></script>
+    <script src="{{url_for('htmx_todo_a1_static', path='hx.js')}}"></script>
+    <script src="https://unpkg.com/@tailwindcss/browser@4"></script>
+    <style type="text/tailwindcss">
+        input{
+                @apply p-2 border-2 border-gray-300 rounded-md;
+            }
+        </style>
+    <title>Document</title>
+</head>
+
+<body>
+    <div x-data
+         x-text="'todo app'"></div>
+    <form hx-post="/htmx_todo_a1/create"
+          hx-target="#goal"
+          hx-swap="beforeend">
+        <input type="text"
+               name="task"
+               placeholder="Enter a task"
+               required>
+        <input type="number"
+               name="priority"
+               id="">
+        <button type="submit">Create</button>
+    </form>
+    <hr class="my-4">
+    <div id="goal">
+        {% include 'todo_list.html' %}
+    </div>
+</body>
+
+</html>
+
+
+<!-- <!DOCTYPE html>
+<html lang="en">
+
+    <head>
+        <meta charset="UTF-8">
+        <title>FastAPI Todo App</title>
+        <link
+            rel="stylesheet"
+            href="/htmx_todo_a1_static/styles.css"
+        >
+    </head>
+
+    <body>
+        <h1>Todo List</h1>
+
+        <form
+            id="add-task-form"
+            method="post"
+            action="/tasks/"
+        >
+            <input
+                type="text"
+                name="task"
+                placeholder="New task..."
+                required
+            >
+            <input
+                type="number"
+                name="priority"
+                min="0"
+                placeholder="Priority"
+                value="0"
+            >
+            <button type="submit">Add Task</button>
+        </form>
+
+        <ul id="todo-list">
+            {% for todo in todos %}
+            <li>
+                <span{%
+                    if
+                    todo.completed
+                    %}
+                    style="text-decoration: line-through;"
+                    {%
+                    endif
+                    %}
+                >
+                    {{ todo.task }} (Priority: {{ todo.priority }})
+                    </span>
+                    {% if not todo.completed %}
+                    <form
+                        method="post"
+                        action="/tasks/{{ todo.id }}/complete"
+                        style="display:inline;"
+                    >
+                        <button type="submit">Complete</button>
+                    </form>
+                    {% endif %}
+            </li>
+            {% else %}
+            <li>No tasks yet!</li>
+            {% endfor %}
+        </ul>
+    </body>
+
+</html> -->

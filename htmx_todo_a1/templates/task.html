@@ -1,0 +1,22 @@
+<li id="li-{{ todo.id }}">
+      <input hx-put="/htmx_todo_a1/toggle"
+             hx-target="#li-{{ todo.id }}"
+             hx-swap="outerHTML"
+             hx-trigger="change"
+             hx-vals='{"id" : "{{ todo.id }}"}'
+             input
+             type="checkbox"
+             name="completed"
+             id="{{ todo.id }}"
+             name="id"
+             {% if todo.completed %}checked{% endif %} />
+      <label for="{{ todo.id }}">{{ todo.task }} (Priority: {{ todo.priority }})</label>
+      <span class="ml-5 font-bold text-green-500 cursor-pointer"
+            hx-get="/htmx_todo_a1/edit/{{ todo.id }}"
+            hx-target="#li-{{ todo.id }}"
+            hx-swap="outerHTML">B</span>
+      <span class="ml-5 font-bold text-red-500 cursor-pointer"
+            hx-delete="/htmx_todo_a1/delete/{{ todo.id }}"
+            hx-target="#li-{{ todo.id }}"
+            hx-swap="outerHTML">D</span>
+</li>

@@ -1,8 +1,10 @@
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
 
 from book_a1 import api as book_a1_api
+from htmx_todo_a1.main import router as htmx_todo_a1_router
 
 
 @asynccontextmanager
@@ -35,7 +37,12 @@ app = FastAPI(
     lifespan=async_lifespan,
 )
 app.include_router(book_a1_api.router)
-
+app.include_router(htmx_todo_a1_router)
+app.mount(
+    "/htmx_todo_a1/static",
+    StaticFiles(directory="htmx_todo_a1/static"),
+    name="htmx_todo_a1_static",
+)
 
 if __name__ == "__main__":
     import uvicorn
