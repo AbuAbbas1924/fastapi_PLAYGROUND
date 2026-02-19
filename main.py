@@ -3,10 +3,13 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
+from auth_a1 import main as auth_a1_main
 from auth_b1.main import router as auth_b1_router
 from book_a1 import api as book_a1_api
-from htmx_todo_a1.main import router as htmx_todo_a1_router
+from htmx_todo_a1.main import router as htmx_todo_a1_main
+from shipping_a1 import api as shipping_a1_api
 
+# print(f"___{auth_a1_main}")
 
 @asynccontextmanager
 async def async_lifespan(app: FastAPI):
@@ -15,7 +18,9 @@ async def async_lifespan(app: FastAPI):
     print("=" * 50)
     try:
         await book_a1_api.db.init()
-        print("\n✓ Application started successfully!\n")
+        print("book_a1 started")
+        async with auth_a1_main.engine.begin() as connection:
+            await connection.run_sync(auth_a1_main.auth_a1_meta.create_all)
     except RuntimeError as e:
         print("\n" + "=" * 50)
         print("❌ STARTUP FAILED")
@@ -30,6 +35,7 @@ async def async_lifespan(app: FastAPI):
     yield
     print("shutdown")
     await book_a1_api.db.close()
+    await auth_a1_main.engine.dispose()
 
 app = FastAPI(
     title="playground",
@@ -38,13 +44,15 @@ app = FastAPI(
     lifespan=async_lifespan,
 )
 app.include_router(book_a1_api.router)
-app.include_router(htmx_todo_a1_router)
+app.include_router(htmx_todo_a1_main)
 app.include_router(auth_b1_router)
 app.mount(
     "/htmx_todo_a1/static",
     StaticFiles(directory="htmx_todo_a1/static"),
     name="htmx_todo_a1_static",
 )
+app.include_router(auth_a1_main.router)
+app.include_router(shipping_a1_api.router)
 
 if __name__ == "__main__":
     import uvicorn

@@ -8,7 +8,7 @@ from passlib.context import CryptContext
 from pydantic import BaseModel
 from sqlmodel import Field, Session, SQLModel, create_engine
 
-engine = create_engine("sqlite:///auth_b1.db")
+engine = create_engine("sqlite:///auth_b1/db.db")
 
 
 def create_tables():
