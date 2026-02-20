@@ -1,9 +1,9 @@
 import datetime
 from enum import Enum
 from random import randint
-from typing import ClassVar
+from typing import Annotated, ClassVar
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy import MetaData
 from sqlmodel import Field, SQLModel, select
@@ -26,6 +26,7 @@ class ShipmentStatus(str, Enum):
 
 router = APIRouter(prefix="/ship", tags=["ship"])
 
+
 class BaseShipment(SQLModel):
     metadata: ClassVar[MetaData] = shipping_a1_meta
     content: str
@@ -39,6 +40,53 @@ class Shipment(BaseShipment, table=True):
     estimated_delivery: datetime.datetime = Field(default_factory=datetime.datetime.now)
 
 
+class ShipmentService:
+    def __init__(self, session: sessionDep):
+        self.session = session
+
+    async def create(self, data: CreateShipment) -> Shipment:
+        shipment = Shipment(
+            **data.model_dump(
+                exclude={"id", "estimated_delivery", "status"}, exclude_none=True
+            ),
+            status=ShipmentStatus.placed,
+            estimated_delivery=datetime.datetime.now(),
+        )
+        self.session.add(shipment)
+        await self.session.commit()
+        await self.session.refresh(shipment)
+        return shipment
+
+    async def get_all(self) -> list[Shipment]:
+        items = await self.session.execute(select(Shipment))
+        return items.scalars().all()
+
+    async def get_id(self, id: int) -> Shipment:
+        # item = await self.session.execute(select(Shipment).where(Shipment.id == id))
+        # item = item.scalars().first()
+        item = await self.session.get(Shipment, id)
+        if item is None:
+            raise HTTPException(status_code=404, detail="Shipment not found")
+        return item
+
+    async def update(self, id: int, shipment: dict) -> Shipment:
+        # item = await self.session.get(Shipment, id)
+        item = await self.get_id(id)
+        item.sqlmodel_update(shipment)
+        self.session.add(item)
+        await self.session.commit()
+        await self.session.refresh(item)
+        return item
+
+    async def delete(self, id: int) -> None:
+        # item = await self.get_id(id)
+        # await self.session.delete(item)
+        # await self.session.commit()
+        await self.session.delete(await self.get_id(id))
+        await self.session.commit()
+        return {"detail": f"Shipment ID: {id} deleted"}
+
+
 class CreateShipment(BaseModel):
     content: str
     weight: float
@@ -47,33 +95,18 @@ class CreateShipment(BaseModel):
 
 @router.post("/add")
 async def create_shipment(data: CreateShipment, session: sessionDep) -> Shipment:
-    # shipment = Shipment(**data.model_dump())
-    shipment = Shipment(
-        **data.model_dump(
-            exclude={"id", "estimated_delivery", "status"}, exclude_none=True
-        ),
-        status=ShipmentStatus.placed,
-        estimated_delivery=datetime.datetime.now(),
-    )
-    session.add(shipment)
-    await session.commit()
-    await session.refresh(shipment)
-    return shipment
+    return await ShipmentService(session).create(data)
 
 
 @router.get("/all")
 async def get_all(session: sessionDep) -> list[Shipment]:
-    items = await session.execute(select(Shipment))
-    return items.scalars().all()
+    return await ShipmentService(session).get_all()
 
 
 @router.get("/{id}", response_model=Shipment)
 async def get_id(id: int, session: sessionDep) -> Shipment:
-    item = await session.execute(select(Shipment).where(Shipment.id == id))
-    item = item.scalars().first()
-    if item is None:
-        raise HTTPException(status_code=404, detail="Shipment not found")
-    return item
+    return await ShipmentService(session).get_id(id)
+
 
 class UpdateShipment(BaseModel):
     id: int
@@ -85,21 +118,9 @@ class UpdateShipment(BaseModel):
 
 @router.put("/update")
 async def update(data: UpdateShipment, session: sessionDep) -> Shipment:
-    item = await session.get(Shipment, data.id)
-    if item is None:
-        raise HTTPException(status_code=404, detail="Shipment not found")
-    item.sqlmodel_update(data.model_dump(exclude={"id"}, exclude_none=True))
-    session.add(item)
-    await session.commit()
-    await session.refresh(item)
-    return item
+    return await ShipmentService(session).update(data.id, data.model_dump())
 
 
 @router.delete("/delete")
 async def delete(id: int, session: sessionDep) -> dict[str, str]:
-    item = await session.get(Shipment, id)
-    if item is None:
-        raise HTTPException(status_code=404, detail="Shipment not found")
-    await session.delete(item)
-    await session.commit()
-    return {"detail": f"Shipment ID: {id} deleted"}
+    return await ShipmentService(session).delete(id)
