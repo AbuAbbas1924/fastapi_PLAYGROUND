@@ -14,27 +14,20 @@ from shipping_a1 import api as shipping_a1_api
 
 @asynccontextmanager
 async def async_lifespan(app: FastAPI):
-    print("=" * 50)
-    print("STARTING APPLICATION")
-    print("=" * 50)
     try:
         await book_a1_api.db.init()
         print("book_a1 started")
         async with auth_a1_main.engine.begin() as connection:
             await connection.run_sync(auth_a1_main.auth_a1_meta.create_all)
+        print("run shipping_a1")
+        await shipping_a1_api.db()
     except RuntimeError as e:
-        print("\n" + "=" * 50)
-        print("❌ STARTUP FAILED")
-        print("=" * 50)
+        print("❌ STARTUP FAILED\n" + "=" * 50)
         print(f"\nReason: {str(e)}")
-        print("\nTo fix this:")
-        print("  1. Start PostgreSQL server")
-        print("  2. Verify connection settings in every .env files")
-        print("  3. Restart the application\n")
         print("=" * 50)
         raise
     yield
-    print("shutdown")
+    print("shutdown ALL_APPS")
     await book_a1_api.db.close()
     await auth_a1_main.engine.dispose()
 

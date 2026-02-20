@@ -62,9 +62,6 @@ class Database:
             logger.info("✓ Database connected successfully")
         except (OperationalError, OSError, ConnectionRefusedError) as e:
             logger.error("✗ Failed to connect to PostgreSQL database")
-            logger.error(f"  Error: {str(e)}")
-            logger.error(f"  Database URL: {settings.DATABASE_URL}")
-            logger.error("  Please ensure PostgreSQL is running and accessible")
             raise RuntimeError(
                 "Database connection failed. Please start PostgreSQL and try again."
             ) from e
