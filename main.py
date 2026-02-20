@@ -7,6 +7,7 @@ from auth_a1 import main as auth_a1_main
 from auth_b1.main import router as auth_b1_router
 from book_a1 import api as book_a1_api
 from htmx_todo_a1.main import router as htmx_todo_a1_main
+from learning import api as learning_api
 from shipping_a1 import api as shipping_a1_api
 
 # print(f"___{auth_a1_main}")
@@ -53,7 +54,7 @@ app.mount(
 )
 app.include_router(auth_a1_main.router)
 app.include_router(shipping_a1_api.router)
-
+app.include_router(learning_api.router)
 if __name__ == "__main__":
     import uvicorn
 
