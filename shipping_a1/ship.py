@@ -74,3 +74,32 @@ async def get_id(id: int, session: sessionDep) -> Shipment:
     if item is None:
         raise HTTPException(status_code=404, detail="Shipment not found")
     return item
+
+class UpdateShipment(BaseModel):
+    id: int
+    content: str
+    weight: float
+    destination: int
+    status: ShipmentStatus
+
+
+@router.put("/update")
+async def update(data: UpdateShipment, session: sessionDep) -> Shipment:
+    item = await session.get(Shipment, data.id)
+    if item is None:
+        raise HTTPException(status_code=404, detail="Shipment not found")
+    item.sqlmodel_update(data.model_dump(exclude={"id"}, exclude_none=True))
+    session.add(item)
+    await session.commit()
+    await session.refresh(item)
+    return item
+
+
+@router.delete("/delete")
+async def delete(id: int, session: sessionDep) -> dict[str, str]:
+    item = await session.get(Shipment, id)
+    if item is None:
+        raise HTTPException(status_code=404, detail="Shipment not found")
+    await session.delete(item)
+    await session.commit()
+    return {"detail": f"Shipment ID: {id} deleted"}
