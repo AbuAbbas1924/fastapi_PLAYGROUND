@@ -86,6 +86,11 @@ class ShipmentService:
         await self.session.commit()
         return {"detail": f"Shipment ID: {id} deleted"}
 
+def shipment_service(session: sessionDep):
+    return ShipmentService(session)
+
+
+serviceDep = Annotated[ShipmentService, Depends(shipment_service)]
 
 class CreateShipment(BaseModel):
     content: str
@@ -94,18 +99,18 @@ class CreateShipment(BaseModel):
 
 
 @router.post("/add")
-async def create_shipment(data: CreateShipment, session: sessionDep) -> Shipment:
-    return await ShipmentService(session).create(data)
+async def create_shipment(data: CreateShipment, service: serviceDep) -> Shipment:
+    return await service.create(data)
 
 
 @router.get("/all")
-async def get_all(session: sessionDep) -> list[Shipment]:
-    return await ShipmentService(session).get_all()
+async def get_all(service: serviceDep) -> list[Shipment]:
+    return await service.get_all()
 
 
 @router.get("/{id}", response_model=Shipment)
-async def get_id(id: int, session: sessionDep) -> Shipment:
-    return await ShipmentService(session).get_id(id)
+async def get_id(id: int, service: serviceDep) -> Shipment:
+    return await service.get_id(id)
 
 
 class UpdateShipment(BaseModel):
@@ -117,10 +122,10 @@ class UpdateShipment(BaseModel):
 
 
 @router.put("/update")
-async def update(data: UpdateShipment, session: sessionDep) -> Shipment:
-    return await ShipmentService(session).update(data.id, data.model_dump())
+async def update(data: UpdateShipment, service: serviceDep) -> Shipment:
+    return await service.update(data.id, data.model_dump(exclude={"id"}))
 
 
 @router.delete("/delete")
-async def delete(id: int, session: sessionDep) -> dict[str, str]:
-    return await ShipmentService(session).delete(id)
+async def delete(id: int, service: serviceDep) -> dict[str, str]:
+    return await service.delete(id)
