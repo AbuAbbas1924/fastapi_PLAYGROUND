@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta, timezone
 from typing import Annotated, ClassVar, Optional
+from uuid import uuid4
 
 import jwt
 from fastapi import APIRouter, Depends, HTTPException
@@ -14,7 +15,13 @@ from pydantic import BaseModel
 from sqlalchemy import MetaData
 from sqlmodel import Field, SQLModel, select
 
-from shipping_a1.db import sessionDep, settings, shipping_a1_meta
+from shipping_a1.db import (
+    add_jti_to_blocklist,
+    check_jti,
+    sessionDep,
+    settings,
+    shipping_a1_meta,
+)
 
 pwd_cxt = CryptContext(schemes=["argon2"], deprecated="auto")
 oauth2_token = OAuth2PasswordBearer(tokenUrl="/shipping_a1/seller/login")
@@ -34,7 +41,11 @@ def generate_access_token(
     # to_encode = data.copy()
     print(f"ENCODE: {data}")
     return jwt.encode(
-        payload={**data, "exp": datetime.now(timezone.utc) + expires_delta},
+        payload={
+            **data,
+            "exp": datetime.now(timezone.utc) + expires_delta,
+            "jti": str(uuid4()),
+        },
         key=settings.JWT_SECRET_KEY,
         algorithm=settings.JWT_ALGORITHM,
     )
@@ -54,9 +65,9 @@ def decode_access_token(token: str) -> dict:
 decodeTokenDep = Annotated[str, Depends(oauth2_token)]
 
 
-def get_access_token(token: decodeTokenDep):
+async def get_access_token(token: decodeTokenDep):
     data = decode_access_token(token)
-    if data is None:
+    if data is None or await check_jti(data.get("jti")):
         raise HTTPException(status_code=401, detail="failed to access token")
     return data
 
@@ -169,3 +180,8 @@ async def dashboard(token: decodeTokenDep, session: sessionDep):
 # async def dashboard(token: str = Depends(OAuth2PasswordBearer(tokenUrl="/seller/token"))):
 async def dashboard2(token: decodeTokenDep):
     return token
+
+@router.get("/logout")
+async def logout(token: accessTokenDep):
+    await add_jti_to_blocklist(token["jti"])
+    return {"msg": "logout", "deleted_token": token}

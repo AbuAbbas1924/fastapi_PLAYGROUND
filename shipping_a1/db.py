@@ -1,11 +1,14 @@
 from pathlib import Path
 from typing import Annotated
+from uuid import uuid4
 
 from fastapi import Depends
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from sqlalchemy import MetaData
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlmodel.ext.asyncio.session import AsyncSession
+
+from shipping_a1.main import Redis
 
 
 class DataBaseSettings(BaseSettings):
@@ -16,6 +19,8 @@ class DataBaseSettings(BaseSettings):
     POSTGRES_PASSWORD: str
     JWT_SECRET_KEY: str
     JWT_ALGORITHM: str
+    REDIS_HOST: str
+    REDIS_PORT: int
     model_config = SettingsConfigDict(
         env_file=Path(__file__).parent / ".env",
         env_file_encoding="utf-8",
@@ -29,8 +34,19 @@ class DataBaseSettings(BaseSettings):
 
 
 settings = DataBaseSettings()
-
 # print(settings.POSTGRES_URL)
+
+token_blacklist = Redis(host=settings.REDIS_HOST, port=settings.REDIS_PORT, db=0)
+
+
+async def add_jti_to_blocklist(jti: str):
+    await token_blacklist.set(jti, "blacklisted")
+
+
+async def check_jti(jti: str):
+    return await token_blacklist.exists(jti)
+
+
 engine = create_async_engine(url=settings.POSTGRES_URL, echo=True)
 shipping_a1_meta = MetaData()
 
