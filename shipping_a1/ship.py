@@ -1,14 +1,17 @@
 import datetime
 from enum import Enum
 from random import randint
-from typing import Annotated, ClassVar
+from typing import Annotated, ClassVar, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
+
+# from pydantic import BaseModel
 from sqlalchemy import MetaData
 from sqlmodel import Field, SQLModel, select
 
 from shipping_a1.db import sessionDep, shipping_a1_meta
+from shipping_a1.seller import sellerDep
 
 
 def random_destination():
@@ -38,6 +41,20 @@ class Shipment(BaseShipment, table=True):
     id: int | None = Field(default=None, primary_key=True)
     status: ShipmentStatus = Field(default=ShipmentStatus.placed)
     estimated_delivery: datetime.datetime = Field(default_factory=datetime.datetime.now)
+
+class CreateShipment(BaseModel):
+    content: str
+    weight: float
+    status: ShipmentStatus
+    destination: Optional[int]
+
+
+class UpdateShipment(BaseModel):
+    id: int
+    content: str
+    weight: float
+    destination: int
+    status: ShipmentStatus
 
 
 class ShipmentService:
@@ -86,46 +103,35 @@ class ShipmentService:
         await self.session.commit()
         return {"detail": f"Shipment ID: {id} deleted"}
 
-def shipment_service(session: sessionDep):
+def shipment_callback(session: sessionDep):
     return ShipmentService(session)
 
 
-serviceDep = Annotated[ShipmentService, Depends(shipment_service)]
-
-class CreateShipment(BaseModel):
-    content: str
-    weight: float
-    destination: int
+serviceDep = Annotated[ShipmentService, Depends(shipment_callback)]
 
 
-@router.post("/add")
-async def create_shipment(data: CreateShipment, service: serviceDep) -> Shipment:
+@router.post("/add", status_code=201)
+async def create_shipment(
+    data: CreateShipment, service: serviceDep, seller: sellerDep
+) -> Shipment:
     return await service.create(data)
 
 
-@router.get("/all")
-async def get_all(service: serviceDep) -> list[Shipment]:
+@router.get("/all", status_code=200)
+async def get_all(service: serviceDep, seller: sellerDep) -> list[Shipment]:
     return await service.get_all()
 
 
-@router.get("/{id}", response_model=Shipment)
-async def get_id(id: int, service: serviceDep) -> Shipment:
+@router.get("/{id}", response_model=Shipment, status_code=200)
+async def get_id(id: int, service: serviceDep, seller: sellerDep) -> Shipment:
     return await service.get_id(id)
 
 
-class UpdateShipment(BaseModel):
-    id: int
-    content: str
-    weight: float
-    destination: int
-    status: ShipmentStatus
-
-
-@router.put("/update")
-async def update(data: UpdateShipment, service: serviceDep) -> Shipment:
+@router.put("/update", status_code=200)
+async def update(data: Shipment, service: serviceDep, seller: sellerDep) -> Shipment:
     return await service.update(data.id, data.model_dump(exclude={"id"}))
 
 
-@router.delete("/delete")
-async def delete(id: int, service: serviceDep) -> dict[str, str]:
+@router.delete("/delete", status_code=200)
+async def delete(id: int, service: serviceDep, seller: sellerDep) -> dict[str, str]:
     return await service.delete(id)

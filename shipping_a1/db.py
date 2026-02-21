@@ -14,6 +14,8 @@ class DataBaseSettings(BaseSettings):
     POSTGRES_DB: str
     POSTGRES_USER: str
     POSTGRES_PASSWORD: str
+    JWT_SECRET_KEY: str
+    JWT_ALGORITHM: str
     model_config = SettingsConfigDict(
         env_file=Path(__file__).parent / ".env",
         env_file_encoding="utf-8",
